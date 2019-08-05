@@ -1,17 +1,607 @@
-﻿using AllProjectsSearch;
-using AllProjectsSearch.UC;
-using Roslyn;
-using sunamo;
-using sunamo.Essential;
-using sunamo.Values;
 using System;
 using System.Collections.Generic;
-using System.Diagnostics;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
-using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Input;
+using sunamo.Constants;
+using sunamo.Essential;
+using SunamoCode;
+using UnManaged;
+using desktop.Controls.ToggleSwitch;
+using desktop.Interfaces;
+using Roslyn;
+using sunamo.Clipboard;
+using sunamo.Interfaces;
+using System.Windows;
+using System.Windows.Data;
+using System.Windows.Documents;
+using System.Windows.Media;
+using System.Windows.Media.Imaging;
+using System.Windows.Navigation;
+using System.Windows.Shapes;
+using AllProjectsSearch;
+using AllProjectsSearch.UC;
+using sunamo;
+using sunamo.Values;
+using System.Diagnostics;
+using System.IO;
+using XliffParser;
+using System.Xml.Linq;
+using System.Xml;
+
+/// <summary>
+/// Manage multilanguage strings in *.xlf files 
+/// Specific methods for working with Xlf from InsertIntoXlfAndConstantCsUC
+/// </summary>
+public class XlfEngine
+{
+    #region Variables
+    public Dictionary<Langs, string> filesWithTranslation = new Dictionary<Langs, string>();
+    public Langs l = Langs.cs;
+    public bool requireUserDecision = false;
+    /// <summary>
+    /// Path to sunamo project (not solution)
+    /// </summary>
+    readonly string basePathXlf = null;
+    /// <summary>
+    /// XlfKeys.cs
+    /// </summary>
+    public readonly string pathXlfKeys = null;
+    public static XlfEngine Instance = new XlfEngine();
+    public const string CopyWhileMassAddingNameFolder = "CopyWhileMassAdding";
+    public bool waitingForUserDecision = false;
+    /// <summary>
+    /// Must be global because HotKey has delegate for handling method
+    /// </summary>
+    public string pascal = null;
+    #endregion
+
+    #region Instances which must to be initialized in InsertIntoXlfAndConstantCsUC
+    public TextBox txtText = new TextBox();
+    public TextBox txtEnglishTranslate = new TextBox();
+    public RadioButton rbEn = new RadioButton();
+    public RadioButton rbCs = new RadioButton();
+    public HotKey acceptHotkey = null;
+    #endregion
+
+    #region Init
+    private XlfEngine()
+    {
+        acceptHotkey = new HotKey(Key.Enter, KeyModifier.Ctrl | KeyModifier.Alt | KeyModifier.Shift | KeyModifier.Win, HotKey.DummyMethod);
+        pathXlfKeys = FS.Combine(DefaultPaths.sunamo, @"sunamo\Constants\XlfKeys.cs");
+        basePathXlf = FS.Combine(DefaultPaths.sunamo, "sunamo");
+    }
+
+    /// <summary>
+    /// Externally called from many places
+    /// </summary>
+    public void InitializeMultilingualResources()
+    {
+        #region Load strings from MultilingualResources file
+        var path = FS.Combine(basePathXlf, "MultilingualResources\\");
+        foreach (var item in FS.GetFiles(path, "*.xlf", System.IO.SearchOption.TopDirectoryOnly))
+        {
+            Langs l2 = XmlLocalisationInterchangeFileFormat.GetLangFromFilename(item);
+            if (!filesWithTranslation.ContainsKey(l2))
+            {
+                filesWithTranslation.Add(l2, item);
+            }
+        }
+        #endregion
+    }
+    #endregion
+
+    #region Add
+    /// <summary>
+    /// Recognize language and set to txt 
+    /// Translate if is needed and put into *.xlf
+    /// </summary>
+    /// <param name="requireUserDecision"></param>
+    /// <param name="text"></param>
+    /// <param name="key2"></param>
+    public void Add(bool requireUserDecision, string text, string key2 = null)
+    {
+        #region Recognize language and set to txt 
+        // If A2 is path, A1 is text
+        if (FS.ExistsFile(text))
+        {
+            return;
+        }
+
+        this.requireUserDecision = requireUserDecision;
+        acceptHotkey.Tag = key2;
+        if (TextLang.IsCzech(text))
+        {
+            l = Langs.cs;
+            //rbCs.IsChecked = true;
+        }
+        else
+        {
+            // not to lb but directly to l. manybe in UC will raise event handler to set l, but in XlfEngine not. 
+            l = Langs.en;
+            //rbEn.IsChecked = true;
+        }
+
+        ClearTextBoxes(false, true);
+        txtText.Text = text;
+        #endregion
+
+        #region Process text
+        if (l == Langs.en)
+        {
+            // Insert as content of <target>
+            // Will use only english so czech don't translate now
+            Add();
+        }
+        else
+        {
+            string englishTranslate = null;
+            englishTranslate = TranslateHelper.Instance.Translate(text, "en", "cs");
+
+            if (char.IsUpper(text[0]))
+            {
+                englishTranslate = SH.FirstCharUpper(englishTranslate);
+
+            }
+
+            txtEnglishTranslate.Text = englishTranslate;
+
+            ThisApp.SetStatus(TypeOfMessage.Error, "Press enter to add or delete to exit");
+            if (requireUserDecision)
+            {
+                waitingForUserDecision = true;
+            }
+            else
+            {
+                Accept(acceptHotkey);
+            }
+        }
+        #endregion
+    }
+
+    /// <summary>
+    /// Insert into xlf file
+    /// </summary>
+    /// <param name="txtEnglishTranslate"></param>
+    private void Add()
+    {
+        if (acceptHotkey.Tag == null)
+        {
+            pascal = ConvertPascalConvention.ToConvention(string.IsNullOrWhiteSpace(txtEnglishTranslate.Text) ? txtText.Text : txtEnglishTranslate.Text);
+        }
+        else
+        {
+            pascal = acceptHotkey.Tag.ToString();
+        }
+
+        // A2 insertToClipboard
+        if (IsAlreadyContainedInXlfKeys(pascal, false))
+        {
+            return;
+        }
+
+        if (!string.IsNullOrWhiteSpace(pascal))
+        {
+            var fromL = GetFrom();
+            var toL = GetTo();
+            if (fromL == Langs.cs)
+            {
+                // Write czech
+                XmlLocalisationInterchangeFileFormat.Append(fromL, string.Empty, txtText.Text, pascal, filesWithTranslation[fromL]);
+                XmlLocalisationInterchangeFileFormat.Append(toL, string.Empty, txtEnglishTranslate.Text, pascal, filesWithTranslation[toL]);
+            }
+            else
+            {
+                XmlLocalisationInterchangeFileFormat.Append(fromL, string.Empty, txtText.Text, pascal, filesWithTranslation[fromL]);
+            }
+
+            AddConsts(CA.ToListString(pascal));
+        }
+    } 
+    #endregion
+
+    #region Other handlers
+    /// <summary>
+    /// Externally called as handler
+    /// </summary>
+    /// <param name="h"></param>
+    public void Accept(HotKey h)
+    {
+        var b1 = waitingForUserDecision;
+        var b2 = (!waitingForUserDecision && !requireUserDecision);
+
+        if (b1 || b2)
+        {
+            Add();
+            // cant be, then will create pascal
+            //if (h.Tag != null)
+            //{
+            //    h.Tag = null;
+            //}
+
+            waitingForUserDecision = false;
+            ThisApp.SetStatus(TypeOfMessage.Success, txtEnglishTranslate.Text + " accepted");
+            ClearTextBoxes(true, true);
+        }
+        else
+        {
+#if DEBUG
+            string postfix = string.Empty;
+
+            if (!waitingForUserDecision)
+            {
+                postfix = ", wasn't waited for user desision. Press button";
+            }
+
+            ThisApp.SetStatus(TypeOfMessage.Information, "wasn't accepted" + postfix);
+#endif
+        }
+    }
+    #endregion
+
+    #region Work with consts in XlfKeys
+    /// <summary>
+    /// Add to XlfKeys.cs from xlf
+    /// Must manually call XlfResourcesH.SaveResouresToRL(DefaultPaths.sunamoProject) before
+    /// called externally from MiAddTranslationWhichIsntInKeys_Click
+    /// </summary>
+    /// <param name="keysAll"></param>
+    public void AddConsts(List<string> keysAll)
+    {
+        int first = -1;
+
+        List<string> lines = null;
+        var keys = GetConsts(out first, out lines);
+
+        var both = CA.CompareList(keys, keysAll);
+        CSharpGenerator csg = new CSharpGenerator();
+
+        foreach (var item in keysAll)
+        {
+            AddConst(csg, item);
+        }
+        lines.Insert(first, csg.ToString());
+
+        TF.SaveLines(lines, pathXlfKeys);
+    }
+
+    /// <summary>
+    /// Add c# const code
+    /// </summary>
+    /// <param name="csg"></param>
+    /// <param name="item"></param>
+    private static void AddConst(CSharpGenerator csg, string item)
+    {
+        csg.Field(1, AccessModifiers.Public, true, VariableModifiers.Mapped, "string", item, true, item);
+    }
+
+    /// <summary>
+    /// Get consts which exists in XlfKeys.cs
+    /// </summary>
+    /// <param name="first"></param>
+    /// <returns></returns>
+    List<string> GetConsts(out int first)
+    {
+        List<string> lines = null;
+        return GetConsts(out first, out lines);
+    }
+
+    /// <summary>
+    /// Get consts which exists in XlfKeys.cs
+    /// </summary>
+    /// <param name="first"></param>
+    /// <param name="lines"></param>
+    /// <returns></returns>
+    List<string> GetConsts(out int first, out List<string> lines)
+    {
+        first = -1;
+
+        lines = TF.ReadAllLines(pathXlfKeys);
+
+        var keys = CSharpParser.ParseConsts(lines, out first);
+        return keys;
+    }
+    #endregion
+
+    #region Methods
+    /// <summary>
+    /// return code for getting from RLData.en
+    /// </summary>
+    /// <param name="key2"></param>
+    /// <returns></returns>
+    public string TextFromRLData(string key2)
+    {
+        return "RLData.en[XlfKeys." + key2 + "]";
+    }
+
+    public void ClearTextBoxes(bool textText, bool textTranslate)
+    {
+        if (textText)
+        {
+            txtText.Text = string.Empty;
+        }
+        if (textTranslate)
+        {
+            txtEnglishTranslate.Text = string.Empty;
+        }
+    }
+
+    /// <summary>
+    /// Return whether A1 is in XlfKeys
+    /// if A2, save A1 to clipboard
+    /// Externally called from InsertIntoXlfAndConstantCsUC.ClipboardMonitor_OnClipboardContentChanged
+    /// </summary>
+    /// <param name="pascal"></param>
+    /// <param name="insertToClipboard"></param>
+    /// <returns></returns>
+    public bool IsAlreadyContainedInXlfKeys(string pascal, bool insertToClipboard)
+    {
+        int first = -1;
+        var keys = GetConsts(out first);
+
+        if (keys.Contains(pascal))
+        {
+            if (insertToClipboard)
+            {
+                ClipboardHelper.SetText(pascal);
+            }
+
+            ThisApp.SetStatus(TypeOfMessage.Information, "Already " + pascal + " contained");
+            return true;
+        }
+        return false;
+    }
+
+    Langs GetFrom()
+    {
+        return l == Langs.cs ? Langs.cs : Langs.en;
+    }
+
+    Langs GetTo()
+    {
+        return l == Langs.cs ? Langs.en : Langs.cs;
+    } 
+    #endregion
+}
+
+
+
+/// <summary>
+/// Interaction logic for InsertIntoXlfAndConstantCsUC.xaml
+/// </summary>
+public partial class InsertIntoXlfAndConstantCsUC : UserControl, IUserControl, IKeysHandler<KeyEventArgs>, IUserControlWithSettingsManager, IUserControlWithMenuItemsList, IWindowOpener, IUserControlWithSizeChange
+{
+    #region Class data
+    static InsertIntoXlfAndConstantCsUC instance = null;
+    public static InsertIntoXlfAndConstantCsUC Instance
+    {
+        get
+        {
+            if (instance == null)
+            {
+                instance = new InsertIntoXlfAndConstantCsUC();
+                instance.Init();
+            }
+            return instance;
+        }
+    }
+    static Type type = typeof(InsertIntoXlfAndConstantCsUC);
+    public string Title => "Insert into xlf and constant *.cs";
+    HorizontalToggleSwitch monitorClipboardHelper;
+    ClipboardMonitor clipboardMonitor = null;
+    InsertIntoXlfAndConstantCsUCMenuItems insertIntoXlfAndConstantCsUCMenuItems = InsertIntoXlfAndConstantCsUCMenuItems.Instance;
+    HotKey declineHotkey = null;
+    bool initialized = false;
+    public ApplicationDataContainer data => MainWindow.Instance.Data;
+    const string sunamoOftenCorruptedWhileGetAllStringsSln = @"d:\Documents\Visual Studio 2017\Projects\sunamoOftenCorruptedWhileGetAllStrings\";
+    public WindowWithUserControl windowWithUserControl { get => MainWindow.Instance.windowWithUserControl; set => MainWindow.Instance.windowWithUserControl = value; }
+    #endregion
+
+    #region XlfEngine data
+    XlfEngine xlfEngine = XlfEngine.Instance;
+
+    #endregion
+
+    #region Init
+    private InsertIntoXlfAndConstantCsUC()
+    {
+        InitializeComponent();
+
+        instance = this;
+
+        Loaded += InsertIntoXlfAndConstantCsUC_Loaded;
+    }
+
+    public void Init()
+    {
+        if (!initialized)
+        {
+            chblFilesOftenCorruptedDuringTranslating.Init();
+
+            data.Add(chblFilesOftenCorruptedDuringTranslating);
+
+            initialized = true;
+
+            AllProjectsSearchHelper.AuthGoogleTranslate();
+
+            #region Tool for monitoring clipboard
+            clipboardMonitor = ClipboardMonitor.Instance;
+
+            monitorClipboardWithLabel.monitorClipboard.IsChecked = false;
+            monitorClipboardHelper = monitorClipboardWithLabel.monitorClipboard;
+            monitorClipboardHelper.Checked += monitorClipboard_Checked;
+            monitorClipboardHelper.Unchecked += monitorClipboard_Unchecked;
+
+            clipboardMonitor.ClipboardContentChanged += ClipboardMonitor_OnClipboardContentChanged;
+            monitorClipboardHelper.IsChecked = false;
+            #endregion
+
+            xlfEngine.acceptHotkey = new HotKey(Key.Enter, KeyModifier.Ctrl, xlfEngine.Accept);
+            declineHotkey = new HotKey(Key.Delete, KeyModifier.Ctrl, Decline);
+            xlfEngine.InitializeMultilingualResources();
+            chblFilesOftenCorruptedDuringTranslating.DefaultButtonsInit();
+
+            XlfEngine.Instance.InitializeMultilingualResources();
+        }
+    }
+    #endregion
+
+    #region InsertIntoXlfAndConstantCsUC handlers
+    private void InsertIntoXlfAndConstantCsUC_Loaded(object sender, RoutedEventArgs e)
+    {
+        xlfEngine.txtText = txtText;
+        xlfEngine.txtEnglishTranslate = txtEnglishTranslate;
+        xlfEngine.rbEn = rbEn;
+        xlfEngine.rbCs = rbCs;
+    } 
+    #endregion
+
+    #region monitorClipboard handlers
+    /// <summary>
+    /// Enable clipboard monitoring
+    /// </summary>
+    /// <param name="sender"></param>
+    /// <param name="e"></param>
+    private void monitorClipboard_Checked(object sender, RoutedEventArgs e)
+    {
+        ClipboardMonitor.Instance.pernamentlyBlock = false;
+        xlfEngine.requireUserDecision = true;
+        xlfEngine.acceptHotkey.Tag = null;
+    }
+
+    /// <summary>
+    /// Disable clipboard monitoring
+    /// </summary>
+    /// <param name="sender"></param>
+    /// <param name="e"></param>
+    private void monitorClipboard_Unchecked(object sender, RoutedEventArgs e)
+    {
+        ClipboardMonitor.Instance.pernamentlyBlock = true;
+        xlfEngine.requireUserDecision = false;
+    }
+    #endregion
+
+    #region Other handlers
+    void Decline(HotKey h)
+    {
+        if (xlfEngine.waitingForUserDecision)
+        {
+            xlfEngine.waitingForUserDecision = false;
+            ThisApp.SetStatus(TypeOfMessage.Success, txtEnglishTranslate.Text + " declined");
+            xlfEngine.ClearTextBoxes(true, true);
+        }
+        else
+        {
+#if DEBUG
+            ThisApp.SetStatus(TypeOfMessage.Information, "wasn't declined");
+#endif
+        }
+    }
+
+
+    /// <summary>
+    /// Insert text into txtInput
+    /// </summary>
+    private void ClipboardMonitor_OnClipboardContentChanged()
+    {
+        if (monitorClipboardHelper.IsChecked)
+        {
+            if (xlfEngine.waitingForUserDecision)
+            {
+                ThisApp.SetStatus(TypeOfMessage.Error, "Actually waiting for user decisiion");
+            }
+            else
+            {
+                string text = ClipboardHelper.GetText();
+                text = text.Trim(AllChars.qm);
+                text = text.TrimEnd(AllChars.colon);
+
+                if (xlfEngine.IsAlreadyContainedInXlfKeys(text, false))
+                {
+                    return;
+                }
+
+                xlfEngine.Add(true, text);
+            }
+        }
+    }
+
+    private void RbEn_Checked(object sender, RoutedEventArgs e)
+    {
+        xlfEngine.l = Langs.en;
+    }
+
+    private void RbCs_Checked(object sender, RoutedEventArgs e)
+    {
+        xlfEngine.l = Langs.cs;
+    }
+    #endregion
+
+    #region Interfaces implements
+    public bool HandleKey(KeyEventArgs e)
+    {
+        return false;
+    }
+
+    public List<MenuItem> MenuItems()
+    {
+        var menuItems = insertIntoXlfAndConstantCsUCMenuItems.MenuItems();
+
+        MenuItem miSetWaitingForUserDecision = MenuItemHelper.CreateNew("Set waiting for user decision", delegate { xlfEngine.waitingForUserDecision = true; });
+        menuItems.Add(miSetWaitingForUserDecision);
+
+        ((Panel)miOftenCorruptedWhileGetAllStrings.Parent).Children.Remove(miOftenCorruptedWhileGetAllStrings);
+        menuItems.Add(miOftenCorruptedWhileGetAllStrings);
+
+        return menuItems;
+    }
+
+    /// <summary>
+    /// Must be in this way and called from MainWindow
+    /// </summary>
+    /// <param name="maxWidth"></param>
+    /// <param name="maxHeight"></param>
+    public void OnSizeChanged(DesktopSize maxSize)
+    {
+        chblFilesOftenCorruptedDuringTranslating.OnSizeChanged(new DesktopSize(this.ActualWidth, maxSize.Height - r0.ActualHeight - r1.ActualHeight - r2.ActualHeight));
+    } 
+    #endregion
+
+    #region MenuItem handlers
+    private void MiBackupOftenCorruptedWhileGetAllStrings_Click(object sender, RoutedEventArgs e)
+    {
+        Backup(DefaultPaths.sunamo, sunamoOftenCorruptedWhileGetAllStringsSln);
+    }
+
+    private void MiRestoreOftenCorruptedWhileGetAllStrings_Click(object sender, RoutedEventArgs e)
+    {
+        Backup(sunamoOftenCorruptedWhileGetAllStringsSln, DefaultPaths.sunamo);
+    }
+    #endregion
+
+    #region Methods
+    void Backup(string from, string to)
+    {
+        var ds = CA.ToListString(chblFilesOftenCorruptedDuringTranslating.CheckedContent());
+
+        foreach (var item in ds)
+        {
+            var files = FS.GetFiles(from, item + ".cs", System.IO.SearchOption.AllDirectories);
+            foreach (var item2 in files)
+            {
+                var newPath = item2.Replace(from, to);
+                FS.CreateUpfoldersPsysicallyUnlessThere(newPath);
+                FS.CopyFile(item2, newPath);
+            }
+        }
+    } 
+    #endregion
+}
+
+
+
 
 /// <summary>
 /// Provide MenuItems() for InsertIntoXlfAndConstantCsUC
@@ -79,7 +669,6 @@ public partial class InsertIntoXlfAndConstantCsUCMenuItems
         TranslateAbleHelper.isNameOfControl = SunamoCodeHelper.IsNameOfControl;
         SunamoTranslateConsts.InitializeNotTranslateAble();
     }
-    #endregion
 
     #region Translate
     /// <summary>
@@ -104,8 +693,6 @@ public partial class InsertIntoXlfAndConstantCsUCMenuItems
     /// <param name="path"></param>
     public void TranlateAllTranslateAbleStringsInFile(SavedStringsData ssd, string path = null)
     {
-        
-
         SplitAllStringsToTranslateAble(path);
         string cs = null;
 
@@ -254,6 +841,7 @@ public partial class InsertIntoXlfAndConstantCsUCMenuItems
 
                 lines.RemoveAt(i);
                 string key = SH.GetTextBetween(text, CSharpParser.c, CSharpParser.eq);
+
                 // Won't be if string will be multilined
                 int first2 = text.IndexOf("\"");
                 int last2 = text.LastIndexOf("\"");
@@ -272,6 +860,7 @@ public partial class InsertIntoXlfAndConstantCsUCMenuItems
 
             TF.SaveLines(lines, filename);
         }
+
         // Cant be because will be execute before other - async method will execute after finishing this
         //acceptHotkey.Tag = null;
 
@@ -340,10 +929,8 @@ public partial class InsertIntoXlfAndConstantCsUCMenuItems
         csts = cs.ToString();
         var occ = SH.ReturnOccurencesOfString(csts, "\"");
 
-
         for (int i = occ.Count - 1; i >= 0; i--)
         {
-
             var pos = occ[i];
             // "1//"
             var ch = cs[pos];
@@ -357,7 +944,6 @@ public partial class InsertIntoXlfAndConstantCsUCMenuItems
                     continue;
                 }
             }
-
 
             #region Removing which is in comment
             var line = SH.GetLineIndexFromCharIndex(csts, pos);
@@ -374,7 +960,6 @@ public partial class InsertIntoXlfAndConstantCsUCMenuItems
             }
             #endregion
         }
-
 
         for (int i = to2Idx.Count - 1; i >= 0; i--)
         {
@@ -399,15 +984,8 @@ public partial class InsertIntoXlfAndConstantCsUCMenuItems
             cs = cs.Insert(to2Idx[i], to2);
         }
 
-
         return occ;
     }
-    #endregion
-
-    #region GetAllStrings
-
-
-
     #endregion
 
     /// <summary>
@@ -459,8 +1037,6 @@ public partial class InsertIntoXlfAndConstantCsUCMenuItems
 
         cs = TF.ReadFile(cFilePath);
 
-
-
         csLines = SH.GetLines(cs);
 
         TF.SaveFile(DateTime.Now.ToShortTimeString() + Environment.NewLine + cs, pathReplaceBadChars + "original.cs");
@@ -485,7 +1061,6 @@ public partial class InsertIntoXlfAndConstantCsUCMenuItems
                 return splitStringsData.bet;
             }
         }
-
 
         var lines = SH.GetLines(cs);
 
@@ -566,8 +1141,6 @@ public partial class InsertIntoXlfAndConstantCsUCMenuItems
 
         TF.SaveFile(DateTime.Now.ToShortTimeString() + Environment.NewLine + cs, pathReplaceBadChars + "replaced.cs");
 
-        
-
         csLines = SH.GetLines(cs);
 
         StringBuilder sbcs = new StringBuilder(cs);
@@ -590,7 +1163,7 @@ public partial class InsertIntoXlfAndConstantCsUCMenuItems
         GetBetween(splitStringsData, cs, dxs, csLines);
         
         TranslateAbleHelper.outsideReplaceBadChars = true;
-    return cs;
+        return cs;
     } 
 
     #region ReplaceBadCharsWorker
@@ -658,8 +1231,6 @@ public partial class InsertIntoXlfAndConstantCsUCMenuItems
 
             between = SH.Substring(cs, indexes[i] + 1, indexes[++i]);
 
-            
-
             if (between.Trim() == string.Empty)
             {
                 continue;
@@ -708,6 +1279,7 @@ public partial class InsertIntoXlfAndConstantCsUCMenuItems
             WriteFile(cFilePath, "!zero elements");
             return;
         }
+
         string c2FilePath = cFilePath;
 
         char firstChar = 'a';
@@ -760,7 +1332,7 @@ public partial class InsertIntoXlfAndConstantCsUCMenuItems
             StringBuilder replaceFor = new StringBuilder();
 
             #region Remove first chars and append first char
-            // Prvně budu pracovat s prefixem
+            // First I will working with prefix
             if (d.first || d.first2)
             {
                 replaceFor.Append("\"");
@@ -850,3 +1422,206 @@ public partial class InsertIntoXlfAndConstantCsUCMenuItems
     #endregion   
 }
 
+
+
+public class XlfResourcesH
+{
+    public static bool initialized = false;
+
+    public static void SaveResouresToRL(string basePath)
+    {
+        SaveResouresToRL(basePath, "cs");
+        SaveResouresToRL(basePath, "en");
+    }
+
+    /// <summary>
+    /// Private to use SaveResouresToRLSunamo
+    /// </summary>
+    private static void SaveResouresToRL()
+    {
+        SaveResouresToRL(Path.GetDirectoryName(Process.GetCurrentProcess().MainModule.FileName));
+    }
+
+    public static void SaveResouresToRLSunamo()
+    {
+        SaveResouresToRL(DefaultPaths.sunamoProject);
+    }
+
+    /// <summary>
+    /// A1 = CS-CZ or CS etc
+    /// </summary>
+    /// <param name="lang"></param>
+    private static void SaveResouresToRL(string basePath, string lang)
+    {
+        // cant be inicialized - after cs is set initialized to true and skip english
+        //initialized = true;
+
+        var path = Path.Combine(basePath, "MultilingualResources");
+        var files = Directory.GetFiles(path, "*.xlf", SearchOption.TopDirectoryOnly);
+        foreach (var file in files)
+        {
+            var fn = FS.GetFileName(file).ToLower();
+            bool isCzech = fn.Contains("cs");
+            bool isEnglish = fn.Contains("en");
+
+            var doc = new XlfDocument(file);
+            lang = lang.ToLower();
+            var xlfFiles = doc.Files.Where(d => d.Original.ToLower().Contains(lang));
+            if (xlfFiles.Count() != 0)
+            {
+                var xlfFile = xlfFiles.First();
+
+                foreach (var u in xlfFile.TransUnits)
+                {
+                    if (isCzech)
+                    {
+                        if (!RLData.cs.ContainsKey(u.Id))
+                        {
+                            RLData.cs.Add(u.Id, u.Target);
+                        }
+                    }
+                    else if (isEnglish)
+                    {
+                        if (!RLData.en.ContainsKey(u.Id))
+                        {
+                            RLData.en.Add(u.Id, u.Target);
+                        }
+                    }
+                    else
+                    {
+                        throw new Exception("Unvalid file" + " " + file + ", " + "please delete it");
+                    }
+                }
+            }
+        }
+    }
+}
+
+
+
+/// <summary>
+/// Trans-units in *.xlf file and others
+/// </summary>
+public class XlfData
+{
+    public XElement group = null;
+    public XDocument xd = null;
+    public IEnumerable<XElement> trans_units = null;
+}
+
+
+
+/// <summary>
+/// General methods for working with XML
+/// </summary>
+public class XmlLocalisationInterchangeFileFormat
+{
+    public static Langs GetLangFromFilename(string s)
+    {
+        s = Path.GetFileNameWithoutExtension(s);
+        var parts = SH.Split(s, AllChars.dot);
+        string last = parts[parts.Count - 1].ToLower();
+        if (last.StartsWith("cs"))
+        {
+            return Langs.cs;
+        }
+        return Langs.en;
+    }
+
+    /// <summary>
+    /// A1 is possible to obtain with XmlLocalisationInterchangeFileFormat.GetLangFromFilename
+    /// </summary>
+    /// <param name="enS"></param>
+    /// <returns></returns>
+    public static void TrimStringResources(Langs toL, string fn)
+    {
+        var d = GetTransUnits(toL, fn);
+        List<XElement> tus = new List<XElement>();
+        foreach (XElement item in d.trans_units)
+        {
+            XElement source = item.Element(XName.Get("source"));
+            XElement target = item.Element(XName.Get("target"));
+
+            TrimValueIfNot(source);
+            TrimValueIfNot(target);
+        }
+
+        d.xd.Save(fn);
+    }
+
+    /// <summary>
+    /// A1 is possible to obtain with XmlLocalisationInterchangeFileFormat.GetLangFromFilename
+    /// </summary>
+    /// <param name="fn"></param>
+    /// <param name="xd"></param>
+    /// <returns></returns>
+    public static XlfData GetTransUnits(Langs toL, string fn)
+    {
+        string enS = File.ReadAllText(fn);
+        XlfData d = new XlfData();
+
+        XmlNamespacesHolder h = new XmlNamespacesHolder();
+        h.ParseAndRemoveNamespaces(enS);
+
+        d.xd = XHelper.CreateXDocument(fn);
+
+        XHelper.AddXmlNamespaces(h.nsmgr);
+
+        XElement xliff = XHelper.GetElementOfName(d.xd, "xliff");
+        var allElements = XHelper.GetElementsOfNameWithAttrContains(xliff, "file", "target-language", toL.ToString(), false);
+        var resources = allElements.Where(d2 => XHelper.Attr(d2, "original").Contains("/" + "RESOURCES" + "/"));
+        XElement file = resources.First();
+        XElement body = XHelper.GetElementOfName(file, "body");
+        d.group = XHelper.GetElementOfName(body, "group");
+        d.trans_units = XHelper.GetElementsOfName(d.group, TransUnit.tTransUnit);
+
+        return d;
+    }
+
+    private static void TrimValueIfNot(XElement source)
+    {
+        string sourceValue = source.Value;
+        if (sourceValue.Length != 0)
+        {
+            if (char.IsWhiteSpace(sourceValue[sourceValue.Length - 1]) || char.IsWhiteSpace(sourceValue[0]))
+            {
+                source.Value = sourceValue.Trim();
+            }
+        }
+    }
+
+    /// <summary>
+    /// 
+    /// </summary>
+    /// <param name="toL"></param>
+    /// <param name="originalSource"></param>
+    /// <param name="translated"></param>
+    /// <param name="pascal"></param>
+    /// <param name="fn"></param>
+    public static void Append(Langs toL, string originalSource, string translated, string pascal, string fn)
+    {
+        var d = GetTransUnits(toL, fn);
+
+        var exists = XHelper.GetElementOfNameWithAttr(d.group, TransUnit.tTransUnit, "id", pascal);
+
+        if (exists != null)
+        {
+            return;
+        }
+
+        TransUnit tu = new TransUnit();
+        tu.id = pascal;
+        tu.source = originalSource;
+        tu.translate = true;
+        tu.target = translated;
+
+        var xml = tu.ToString();
+        XElement xe = XElement.Parse(xml);
+        xe = XHelper.MakeAllElementsWithDefaultNs(xe);
+
+        d.group.Add(xe);
+        d.xd.Save(fn);
+
+        XHelper.FormatXml(fn);
+    }
+}
