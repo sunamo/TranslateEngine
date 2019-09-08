@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
@@ -549,7 +549,7 @@ public partial class InsertIntoXlfAndConstantCsUC : UserControl, IUserControl, I
     {
         var menuItems = insertIntoXlfAndConstantCsUCMenuItems.MenuItems();
 
-        MenuItem miSetWaitingForUserDecision = MenuItemHelper.CreateNew("Set waiting for user decision", delegate { xlfEngine.waitingForUserDecision = true; });
+        MenuItem miSetWaitingForUserDecision = MenuItemHelper.Get("Set waiting for user decision", delegate { xlfEngine.waitingForUserDecision = true; });
         menuItems.Add(miSetWaitingForUserDecision);
 
         ((Panel)miOftenCorruptedWhileGetAllStrings.Parent).Children.Remove(miOftenCorruptedWhileGetAllStrings);
@@ -878,29 +878,29 @@ public partial class InsertIntoXlfAndConstantCsUCMenuItems
         List<MenuItem> menuItems = new List<MenuItem>();
 
         // Add to XlfKeys.cs from xlf
-        MenuItem miAddTranslationWhichIsntInKeys = MenuItemHelper.CreateNew("Add translation which isnt in keys (load from RLData.en)");
+        MenuItem miAddTranslationWhichIsntInKeys = MenuItemHelper.Get("Add translation which isnt in keys (load from RLData.en)");
         miAddTranslationWhichIsntInKeys.Click += MiAddTranslationWhichIsntInKeys_Click;
         menuItems.Add(miAddTranslationWhichIsntInKeys);
 
         // Load all consts from cs file and create instead of them properties which refer to RLData
-        MenuItem miCreatePropertiesFromConsts = MenuItemHelper.CreateNew("Create properties from consts (file path in clipboard)", BtnCreatePropertiesFromConsts_Click); menuItems.Add(miCreatePropertiesFromConsts);
+        MenuItem miCreatePropertiesFromConsts = MenuItemHelper.Get("Create properties from consts (file path in clipboard)", BtnCreatePropertiesFromConsts_Click); menuItems.Add(miCreatePropertiesFromConsts);
 
         // Set to clipboard assigment fields in ctor
-        MenuItem miCreateAssigmentFromFields = MenuItemHelper.CreateNew("Create assigment from fields");
+        MenuItem miCreateAssigmentFromFields = MenuItemHelper.Get("Create assigment from fields");
         miCreateAssigmentFromFields.Click += MiCreateAssigmentFromFields_Click;
         menuItems.Add(miCreateAssigmentFromFields);
 
         // Remove all comments from postfix, Create parameters to methods
-        MenuItem miCreateParametersToMethod = MenuItemHelper.CreateNew("Create parameter to method");
+        MenuItem miCreateParametersToMethod = MenuItemHelper.Get("Create parameter to method");
         miCreateParametersToMethod.Click += MiCreateParametersToMethod_Click;
         menuItems.Add(miCreateParametersToMethod);
 
         // Split all strings to translate-able and not. Working only with c# files
-        MenuItem miReplaceAllStringsInFiles = MenuItemHelper.CreateNew("1. Split all splitable strings in files to translate-able (put path in clipboard)");
+        MenuItem miReplaceAllStringsInFiles = MenuItemHelper.Get("1. Split all splitable strings in files to translate-able (put path in clipboard)");
         miReplaceAllStringsInFiles.Click += MiSplitAllStringsToTranslateAble_Click;
         menuItems.Add(miReplaceAllStringsInFiles);
 
-        MenuItem miTranlateAllTranslateAbleStringsInFile = MenuItemHelper.CreateNew("2. Translate all translate-able strings in file");
+        MenuItem miTranlateAllTranslateAbleStringsInFile = MenuItemHelper.Get("2. Translate all translate-able strings in file");
         miTranlateAllTranslateAbleStringsInFile.Click += MiTranlateAllTranslateAbleStringsInFile_Click;
         menuItems.Add(miTranlateAllTranslateAbleStringsInFile);
 
