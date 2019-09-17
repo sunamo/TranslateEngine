@@ -1457,7 +1457,7 @@ public class XlfResourcesH
         //initialized = true;
 
         var path = Path.Combine(basePath, "MultilingualResources");
-        var files = Directory.GetFiles(path, "*.xlf", SearchOption.TopDirectoryOnly);
+        var files = FS.GetFiles(path, "*.xlf", SearchOption.TopDirectoryOnly);
         foreach (var file in files)
         {
             var fn = FS.GetFileName(file).ToLower();
@@ -1518,7 +1518,7 @@ public class XmlLocalisationInterchangeFileFormat
 {
     public static Langs GetLangFromFilename(string s)
     {
-        s = Path.GetFileNameWithoutExtension(s);
+        s = FS.GetFileNameWithoutExtension(s);
         var parts = SH.Split(s, AllChars.dot);
         string last = parts[parts.Count - 1].ToLower();
         if (last.StartsWith("cs"))
