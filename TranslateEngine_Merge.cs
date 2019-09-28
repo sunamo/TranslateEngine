@@ -1561,7 +1561,7 @@ public class XmlLocalisationInterchangeFileFormat
         XlfData d = new XlfData();
 
         XmlNamespacesHolder h = new XmlNamespacesHolder();
-        h.ParseAndRemoveNamespaces(enS);
+        h.ParseAndRemoveNamespacesXmlDocument(enS);
 
         d.xd = XHelper.CreateXDocument(fn);
 
