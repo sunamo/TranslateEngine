@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
@@ -330,7 +330,7 @@ public class XlfEngine
     /// <summary>
     /// Interaction logic for InsertIntoXlfAndConstantCsUC.xaml
     /// </summary>
-    public partial class InsertIntoXlfAndConstantCsUC : UserControl, IUserControl, IKeysHandler<KeyEventArgs>, IUserControlWithSettingsManager, IUserControlWithMenuItemsList, IWindowOpener, IUserControlWithSizeChange
+    public partial class InsertIntoXlfAndConstantCsUC : UserControl, IUserControl, IKeysHandler, IUserControlWithSettingsManager, IUserControlWithMenuItemsList, IWindowOpener, IUserControlWithSizeChange
     {
     #region Class data
     static InsertIntoXlfAndConstantCsUC instance = null;
