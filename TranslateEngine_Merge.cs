@@ -253,7 +253,6 @@ public class XlfEngine
     /// Get consts which exists in XlfKeys.cs
     /// </summary>
     /// <param name="first"></param>
-    /// <returns></returns>
     List<string> GetConsts(out int first)
     {
         List<string> lines = null;
@@ -264,7 +263,6 @@ public class XlfEngine
     /// </summary>
     /// <param name="first"></param>
     /// <param name="lines"></param>
-    /// <returns></returns>
     List<string> GetConsts(out int first, out List<string> lines)
     {
         first = -1;
@@ -278,7 +276,6 @@ public class XlfEngine
     /// return code for getting from RLData.en
     /// </summary>
     /// <param name="key2"></param>
-    /// <returns></returns>
     public string TextFromRLData(string key2)
     {
         return "RLData.en[XlfKeys." + key2 + "]";
@@ -301,7 +298,6 @@ public class XlfEngine
     /// </summary>
     /// <param name="pascal"></param>
     /// <param name="insertToClipboard"></param>
-    /// <returns></returns>
     public bool IsAlreadyContainedInXlfKeys(string pascal, bool insertToClipboard)
     {
         int first = -1;
@@ -781,7 +777,6 @@ public class XlfEngine
     /// </summary>
     /// <param name="cs"></param>
     /// <param name="csLines"></param>
-    /// <returns></returns>
     private List<int> GetQuotes(ref StringBuilder cs, List<string> csLines)
     {
         var csts = cs.ToString();
@@ -851,7 +846,6 @@ public class XlfEngine
     /// Return null in case of any exception
     /// In get are only translate able strings
     /// </summary>
-    /// <returns></returns>
     public CollectionWithoutDuplicates<string> GetAllStringsIn(SplitStringsData splitStringsData, ref string cFilePath, out string cs, out List<string> csLines)
     {
         InitializeNotTranslateAble();
@@ -987,7 +981,6 @@ public class XlfEngine
     /// <param name="cs"></param>
     /// <param name="loading"></param>
     /// <param name="result"></param>
-    /// <returns></returns>
     private static string ReplaceBadCharsWorker(ref string cs, bool loading, CollectionWithoutDuplicates<string> result)
     {
         if (result == null)
@@ -1286,7 +1279,6 @@ public class XlfEngine
     /// A1 is possible to obtain with XmlLocalisationInterchangeFileFormat.GetLangFromFilename
     /// </summary>
     /// <param name="enS"></param>
-    /// <returns></returns>
     public static void TrimStringResources(Langs toL, string fn)
     {
         var d = GetTransUnits(toL, fn);
@@ -1305,7 +1297,6 @@ public class XlfEngine
     /// </summary>
     /// <param name="fn"></param>
     /// <param name="xd"></param>
-    /// <returns></returns>
     public static XlfData GetTransUnits(Langs toL, string fn)
     {
         string enS = File.ReadAllText(fn);
