@@ -893,7 +893,7 @@ public class XlfEngine
             if (throwExceptions)
             {
                 AllProjectsSearchSettings.filesNotToTranslate.Add(FS.GetFileNameWithoutExtension(cFilePath));
-                //ThrowExceptions.Custom(type, methodName, "Number of quotes is not even, source: " + FS.GetFileName(cFilePath));
+                //ThrowExceptions.Custom(Exc.GetStackTrace(),type, methodName, "Number of quotes is not even, source: " + FS.GetFileName(cFilePath));
                 return splitStringsData.bet;
             }
         }
@@ -965,7 +965,7 @@ public class XlfEngine
         {
             if (throwExceptions)
             {
-                //ThrowExceptions.Custom(type, methodName, "Number of quotes is not even, source: " + FS.GetFileName(cFilePath));
+                //ThrowExceptions.Custom(Exc.GetStackTrace(),type, methodName, "Number of quotes is not even, source: " + FS.GetFileName(cFilePath));
                 AllProjectsSearchSettings.filesNotToTranslate.Add(FS.GetFileNameWithoutExtension(cFilePath));
                 return cs;
             }
@@ -1243,7 +1243,7 @@ public class XlfEngine
                     }
                     else
                     {
-                        throw new Exception("Unvalid file" + " " + file + ", " + "please delete it");
+                        ThrowExceptions.Custom(Exc.GetStackTrace(), type, Exc.CallingMethod(),"Unvalid file" + " " + file + ", " + "please delete it");
                     }
                 }
             }
