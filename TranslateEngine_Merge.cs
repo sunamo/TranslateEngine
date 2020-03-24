@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
@@ -526,7 +526,7 @@ public class XlfEngine
     public partial class InsertIntoXlfAndConstantCsUCMenuItems
     {
     #region Properties
-    const string rlData = "RLData.en[";
+    const string rlData = "RLData.en[XlfKeys.;
     static Type type = typeof(InsertIntoXlfAndConstantCsUCMenuItems);
     XlfEngine xlfEngine = XlfEngine.Instance;
     public static InsertIntoXlfAndConstantCsUCMenuItems Instance = new InsertIntoXlfAndConstantCsUCMenuItems();
@@ -541,7 +541,7 @@ public class XlfEngine
             XlfEngine.Instance.pascal = value;
         }
     }
-    const string pathAllStringsInFile = @"d:\Desktop\strings in sunamo\files\";
+    const string pathAllStringsInFile = @d:\Desktop\strings in sunamo\files\";
     const string pathReplaceBadChars = @"d:\Desktop\strings in sunamo\_ReplaceBadChars\";
     public static bool throwExceptions = true;
     /// <summary>
