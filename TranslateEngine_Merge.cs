@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
@@ -1299,7 +1299,7 @@ public class XlfEngine
     /// <param name="xd"></param>
     public static XlfData GetTransUnits(Langs toL, string fn)
     {
-        string enS = File.ReadAllText(fn);
+        string enS = FS.ReadAllText(fn);
         XlfData d = new XlfData();
         XmlNamespacesHolder h = new XmlNamespacesHolder();
         h.ParseAndRemoveNamespacesXmlDocument(enS);
