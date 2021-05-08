@@ -278,7 +278,7 @@ public class XlfEngine
     /// <param name="key2"></param>
     public string TextFromRLData(string key2)
     {
-        return "RLData.en[XlfKeys." + key2 + "]";
+        return "sess.i18n(XlfKeys." + key2 + ")";
     }
     public void ClearTextBoxes(bool textText, bool textTranslate)
     {
@@ -526,7 +526,7 @@ public class XlfEngine
     public partial class InsertIntoXlfAndConstantCsUCMenuItems
     {
     #region Properties
-    const string rlData = "RLData.en[XlfKeys.;
+    const string rlData = "sess.i18n(XlfKeys.;
     static Type type = typeof(InsertIntoXlfAndConstantCsUCMenuItems);
     XlfEngine xlfEngine = XlfEngine.Instance;
     public static InsertIntoXlfAndConstantCsUCMenuItems Instance = new InsertIntoXlfAndConstantCsUCMenuItems();
@@ -618,7 +618,7 @@ public class XlfEngine
         {
             for (int i = s.Count - 1; i >= 0; i--)
             {
-                if (notToTranslate.c.Contains(s[i]))
+                if (notToTranslate.c.Contains(s[i)))
                 {
                     s.RemoveAt(i);
                 }
