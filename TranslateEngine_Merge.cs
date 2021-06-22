@@ -350,7 +350,7 @@ public class XlfEngine
     HotKey declineHotkey = null;
     bool initialized = false;
     public ApplicationDataContainer data => MainWindow.Instance.Data;
-    const string sunamoOftenCorruptedWhileGetAllStringsSln = @"e:\Documents\Visual Studio 2017\Projects\sunamoOftenCorruptedWhileGetAllStrings\";
+    const string sunamoOftenCorruptedWhileGetAllStringsSln = @"e:\Documents\vs\Projects\sunamoOftenCorruptedWhileGetAllStrings\";
     public WindowWithUserControl windowWithUserControl { get => MainWindow.Instance.windowWithUserControl; set => MainWindow.Instance.windowWithUserControl = value; }
     #endregion
     #region XlfEngine data
